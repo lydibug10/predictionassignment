@@ -1,0 +1,65 @@
+---
+title: "Weight Lifting Prediction Assignment"
+author: "Lydia Cromwell"
+date: "June 9, 2018"
+output: 
+  html_document:
+    keep_md: yes
+    self_contained: yes
+---
+
+# Overview
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# The Data
+
+The data is source from http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har
+
+```{R echo=TRUE}
+trainingData <- read.csv("pml-training.csv")
+testingData <- read.csv("pml-testing.csv")
+```
+
+We cleanse the data by removing N/As and other unnecessary columns otherwise the model algorithm will fail. This will also shrink the dataset so the model runs quicker.
+```{R echo=TRUE, warning=FALSE}
+# Remove NA values
+trainingData <- trainingData[,colSums(is.na(trainingData)) == 0]
+testingData <- testingData[,colSums(is.na(testingData)) == 0]
+classe <- trainingData$classe
+# Remove timestamp and extra data
+trainingData <- trainingData[,8:59]
+trainingData <- trainingData[, sapply(trainingData, is.numeric)]
+testingData <- testingData[,8:59]
+testingData <- testingData[, sapply(testingData, is.numeric)]
+trainingData$classe <- classe
+```
+
+We then partition the training data 60/40
+```{R echo=TRUE, warning=FALSE, info=FALSE}
+library(caret)
+set.seed(20180612)
+trainPartition <- createDataPartition(trainingData$classe, p=0.6, list=FALSE)
+trainingDataPartition <- trainingData[trainPartition,]
+testingDataPartition <- trainingData[-trainPartition,]
+```
+
+# Data Modeling
+We use the GBM algorithm for modeling the data and building a decision tree.
+```{R echo=TRUE, warning=FALSE}
+# Use cv resampling mode and GBM algorithm to train the model
+control <- trainControl(method="cv", number=5, repeats=1)
+gbmmodel <- train(classe ~ ., data=trainingDataPartition, method="rf", trControl=control, verbose=FALSE)
+gbmmodel$finalModel
+
+prediction <- predict(gbmmodel, newdata=testingDataPartition)
+confusionMatrix(testingDataPartition$classe, prediction)
+```
+
+This GBM model gives a 97.48% Accuracy which is pretty good with an error of ~3%. Let's now apply that to the test data.
+
+# Apply the model to the TestData
+We apply our model to the test data and use these answers for the quiz
+```{R echo=TRUE, warning=FALSE, info=FALSE}
+predict(gbmmodel, newdata=testingData)
+```
